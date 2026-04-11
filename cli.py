@@ -1,34 +1,62 @@
+from models import ActionType, OrderType
+
+
 def run_cli(exchange):
     while True:
-        cmd = input("Action: ")
+        cmd = input("Action: ").strip()
 
-        if cmd == "QUIT":
+        if cmd.upper() == "QUIT":
             break
 
         parts = cmd.split()
 
-        try:
-            if parts[0] in ["BUY", "SELL"]:
-                side = parts[0]
-                symbol = parts[1]
-                order_type = parts[2]
+        if not parts:
+            continue
 
-                if order_type == "LMT":
-                    price = float(parts[3].replace("$", ""))
-                    qty = int(parts[4])
+        try:
+            command = parts[0].upper()
+
+            if command in ["BUY", "SELL"]:
+                if len(parts) < 4:
+                    raise ValueError("Not enough arguments")
+
+                action_type = ActionType(command)
+                name = parts[1]
+                order_type = OrderType(parts[2].upper())
+
+                if order_type == OrderType.LMT:
+                    if len(parts) < 5:
+                        raise ValueError("LMT requires price and quantity")
+
+                    price = float(parts[3])
+                    quantity = int(parts[4])
                 else:
                     price = None
-                    qty = int(parts[3])
+                    quantity = int(parts[3])
 
-                order = exchange.place_order(symbol, side, order_type, price, qty)
+                order = exchange.place_order(
+                    name=name,
+                    action_type=action_type,
+                    order_type=order_type,
+                    price=price,
+                    quantity=quantity,
+                )
 
-                print(f"You placed: {order}")
+                print(order)
 
-            elif parts[0] == "VIEW":
+            elif command == "VIEW":
                 exchange.view_orders()
 
-            elif parts[0] == "QUOTE":
+            elif command == "QUOTE":
+                if len(parts) != 2:
+                    raise ValueError("Usage: QUOTE <SYMBOL>")
                 exchange.quote(parts[1])
 
-        except Exception as e:
+            else:
+                print("Unknown command")
+
+        except ValueError as e:
             print("Error:", e)
+
+        except Exception as e:
+            print("Unexpected error:", e)

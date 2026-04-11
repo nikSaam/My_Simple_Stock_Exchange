@@ -1,4 +1,4 @@
-from models import Order
+from models import Order, ActionType, OrderType
 from order_book import OrderBook
 
 
@@ -6,70 +6,93 @@ class Exchange:
     def __init__(self):
         self.book = OrderBook()
         self.orders = []
-        self.last_price = None
         self.counter = 1
+        self.last_price = None
 
-    def place_order(self, symbol, side, order_type, price, quantity):
-        # создаём заявку
-        order = Order(self.counter, symbol, order_type, price, side, quantity)
+    def place_order(self, name, action_type, order_type, price, quantity):
+        if order_type == OrderType.MKT:
+            price = None
+
+        order = Order(
+            id=self.counter,
+            action_type=action_type,
+            name=name,
+            order_type=order_type,
+            price=price,
+            quantity=quantity,
+        )
+
         self.counter += 1
 
-        # сохраняем
         self.orders.append(order)
         self.book.add(order)
         self.book.sort()
 
-        # пытаемся исполнить
         self.match()
 
         return order
 
     def match(self):
-        # основной matching engine
-        for buy in self.book.buys:
-            if buy.remaining() == 0:
+        while self.book.buys and self.book.sells:
+
+            buy = self.book.buys[0]
+            sell = self.book.sells[0]
+
+            if buy.remaining == 0:
+                self.book.buys.pop(0)
                 continue
 
-            for sell in self.book.sells:
-                if sell.remaining() == 0:
-                    continue
+            if sell.remaining == 0:
+                self.book.sells.pop(0)
+                continue
 
-                # проверяем, что это одна акция
-                if buy.symbol != sell.symbol:
-                    continue
+            if buy.name != sell.name:
+                break
 
-                # условие сделки
-                if (
-                    buy.order_type == "MKT"
-                    or sell.order_type == "MKT"
-                    or buy.price >= sell.price
-                ):
-                    trade_qty = min(buy.remaining(), sell.remaining())
+            if buy.order_type == OrderType.MKT and sell.order_type == OrderType.MKT:
+                break
 
-                    # определяем цену сделки
-                    trade_price = sell.price if sell.price else buy.price
+            if (
+                buy.price is not None and
+                sell.price is not None and
+                buy.price < sell.price
+            ):
+                break
 
-                    # обновляем
-                    buy.filled += trade_qty
-                    sell.filled += trade_qty
+            trade_qty = min(buy.remaining, sell.remaining)
 
-                    self.last_price = trade_price
+            if sell.price is not None:
+                trade_price = sell.price
+            else:
+                trade_price = buy.price
 
-                    # если BUY полностью исполнен — дальше не идём
-                    if buy.remaining() == 0:
-                        break
+            if trade_price is None:
+                break
+
+            buy.filled += trade_qty
+            sell.filled += trade_qty
+
+            self.last_price = trade_price
+
+            if buy.remaining == 0:
+                self.book.buys.pop(0)
+
+            if sell.remaining == 0:
+                self.book.sells.pop(0)
 
     def view_orders(self):
-        for i, o in enumerate(self.orders, 1):
-            print(f"{i}. {o}")
+        for o in self.orders:
+            print(o)
 
     def quote(self, symbol):
-        # лучшие цены
         bids = [
-            o.price for o in self.book.buys if o.symbol == symbol and o.remaining() > 0
+            o.price for o in self.book.buys
+            if o.name == symbol and o.remaining > 0 and o.price is not None
         ]
+
         asks = [
-            o.price for o in self.book.sells if o.symbol == symbol and o.remaining() > 0
+            o.price for o in self.book.sells
+            if o.name == symbol and o.remaining > 0 and o.price is not None
         ]
 
         bid = max(bids) if bids else None

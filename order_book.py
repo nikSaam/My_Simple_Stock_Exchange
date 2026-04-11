@@ -4,15 +4,14 @@ class OrderBook:
         self.sells = []
 
     def add(self, order):
-        # кладём заявку в нужный список
-        if order.side == "BUY":  # Утиная типизация
+        if order.action_type.value == "BUY":
             self.buys.append(order)
         else:
             self.sells.append(order)
 
     def sort(self):
-        # BUY: чем выше цена — тем раньше
-        self.buys.sort(key=lambda o: o.price if o.price else float("inf"), reverse=True)
+        # BUY — по убыванию цены (None в конец)
+        self.buys.sort(key=lambda o: (o.price is None, -(o.price or 0)))
 
-        # SELL: чем ниже цена — тем раньше
-        self.sells.sort(key=lambda o: o.price if o.price else 0)
+        # SELL — по возрастанию цены (None в конец)
+        self.sells.sort(key=lambda o: (o.price is None, o.price or 0))
