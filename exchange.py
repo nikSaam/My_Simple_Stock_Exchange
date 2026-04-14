@@ -1,4 +1,4 @@
-from models import Order, ActionType, OrderType
+from models import Order, OrderType, Trade
 from order_book import OrderBook
 
 
@@ -6,8 +6,9 @@ class Exchange:
     def __init__(self):
         self.book = OrderBook()
         self.orders = []
+        self.trades = []
         self.counter = 1
-        self.last_price = None
+        self.last_price = {}
 
     def place_order(self, name, action_type, order_type, price, quantity):
         if order_type == OrderType.MKT:
@@ -26,32 +27,34 @@ class Exchange:
 
         self.orders.append(order)
         self.book.add(order)
-        self.book.sort()
+        self.book.sort(name)
 
-        self.match()
+        self.match(name)
 
         return order
 
-    def match(self):
-        while self.book.buys and self.book.sells:
+    def match(self, name):
+        buys = self.book.buys[name]
+        sells = self.book.sells[name]
 
-            buy = self.book.buys[0]
-            sell = self.book.sells[0]
+        while buys and sells:
+
+            buy = buys[0]
+            sell = sells[0]
 
             if buy.remaining == 0:
-                self.book.buys.pop(0)
+                buys.pop(0)
                 continue
 
             if sell.remaining == 0:
-                self.book.sells.pop(0)
+                sells.pop(0)
                 continue
 
-            if buy.name != sell.name:
-                break
-
+            # Нельзя MKT vs MKT
             if buy.order_type == OrderType.MKT and sell.order_type == OrderType.MKT:
                 break
 
+            # Проверка цены
             if (
                 buy.price is not None and
                 sell.price is not None and
@@ -61,41 +64,52 @@ class Exchange:
 
             trade_qty = min(buy.remaining, sell.remaining)
 
-            if sell.price is not None:
-                trade_price = sell.price
-            else:
-                trade_price = buy.price
+            trade_price = sell.price if sell.price is not None else buy.price
 
             if trade_price is None:
                 break
 
+            # Обновляем ордера
             buy.filled += trade_qty
             sell.filled += trade_qty
 
-            self.last_price = trade_price
+            # Сохраняем сделку
+            trade = Trade(name=name, price=trade_price, quantity=trade_qty)
+            self.trades.append(trade)
+
+            # Последняя цена по тикеру
+            self.last_price[name] = trade_price
 
             if buy.remaining == 0:
-                self.book.buys.pop(0)
+                buys.pop(0)
 
             if sell.remaining == 0:
-                self.book.sells.pop(0)
+                sells.pop(0)
 
     def view_orders(self):
         for o in self.orders:
             print(o)
 
-    def quote(self, symbol):
+    def view_trades(self):
+        for t in self.trades:
+            print(t)
+
+    def quote(self, name):
+        buys = self.book.buys[name]
+        sells = self.book.sells[name]
+
         bids = [
-            o.price for o in self.book.buys
-            if o.name == symbol and o.remaining > 0 and o.price is not None
+            o.price for o in buys
+            if o.remaining > 0 and o.price is not None
         ]
 
         asks = [
-            o.price for o in self.book.sells
-            if o.name == symbol and o.remaining > 0 and o.price is not None
+            o.price for o in sells
+            if o.remaining > 0 and o.price is not None
         ]
 
         bid = max(bids) if bids else None
         ask = min(asks) if asks else None
+        last = self.last_price.get(name)
 
-        print(f"{symbol} BID: {bid} ASK: {ask} LAST: {self.last_price}")
+        print(f"{name} BID: {bid} ASK: {ask} LAST: {last}")

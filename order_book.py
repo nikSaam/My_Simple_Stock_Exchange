@@ -1,17 +1,31 @@
+from collections import defaultdict
+from models import OrderType
+
+
 class OrderBook:
     def __init__(self):
-        self.buys = []
-        self.sells = []
+        self.buys = defaultdict(list)
+        self.sells = defaultdict(list)
 
     def add(self, order):
         if order.action_type.value == "BUY":
-            self.buys.append(order)
+            self.buys[order.name].append(order)
         else:
-            self.sells.append(order)
+            self.sells[order.name].append(order)
 
-    def sort(self):
-        # BUY — по убыванию цены (None в конец)
-        self.buys.sort(key=lambda o: (o.price is None, -(o.price or 0)))
+    def sort(self, name):
+        # BUY: MKT вперед, далее по большей цене
+        self.buys[name].sort(
+            key=lambda o: (
+                o.order_type != OrderType.MKT,
+                -(o.price or 0)
+            )
+        )
 
-        # SELL — по возрастанию цены (None в конец)
-        self.sells.sort(key=lambda o: (o.price is None, o.price or 0))
+        # SELL: MKT первым, далее по меньшей цене
+        self.sells[name].sort(
+            key=lambda o: (
+                o.order_type != OrderType.MKT,
+                (o.price or float("inf"))
+            )
+        )

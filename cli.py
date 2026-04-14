@@ -17,17 +17,11 @@ def run_cli(exchange):
             command = parts[0].upper()
 
             if command in ["BUY", "SELL"]:
-                if len(parts) < 4:
-                    raise ValueError("Not enough arguments")
-
                 action_type = ActionType(command)
                 name = parts[1]
                 order_type = OrderType(parts[2].upper())
 
                 if order_type == OrderType.LMT:
-                    if len(parts) < 5:
-                        raise ValueError("LMT requires price and quantity")
-
                     price = float(parts[3])
                     quantity = int(parts[4])
                 else:
@@ -47,16 +41,14 @@ def run_cli(exchange):
             elif command == "VIEW":
                 exchange.view_orders()
 
+            elif command == "TRADES":
+                exchange.view_trades()
+
             elif command == "QUOTE":
-                if len(parts) != 2:
-                    raise ValueError("Usage: QUOTE <SYMBOL>")
                 exchange.quote(parts[1])
 
             else:
                 print("Unknown command")
 
-        except ValueError as e:
-            print("Error:", e)
-
         except Exception as e:
-            print("Unexpected error:", e)
+            print("Error:", e)

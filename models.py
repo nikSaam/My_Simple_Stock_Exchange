@@ -38,3 +38,12 @@ class Order:
     def __str__(self):
         price = f"${self.price:.2f}" if self.price is not None else "MKT"
         return f"{self.name} {self.order_type.value} {self.action_type.value} {price} {self.filled}/{self.quantity} {self.status}"
+
+@dataclass
+class Trade:
+    name: str
+    price: float
+    quantity: int
+
+    def __str__(self):
+        return f"TRADE {self.name} {self.price} x {self.quantity}"
